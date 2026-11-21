@@ -1,0 +1,36 @@
+{
+  "name": "agent-bridge",
+  "version": "1.0.0",
+  "description": "Remote MCP server that lets ChatGPT hand tasks off to Claude Code routines without holding the routine token",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc",
+    "test": "vitest run",
+    "check": "tsc && vitest run && wrangler deploy --dry-run --outdir dist"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/atticoos/agent-bridge.git"
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/atticoos/agent-bridge/issues"
+  },
+  "homepage": "https://github.com/atticoos/agent-bridge#readme",
+  "dependencies": {
+    "@cfworker/json-schema": "^4.1.6",
+    "@cloudflare/workers-oauth-provider": "^1.2.4",
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "hono": "^4.13.19",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261121.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.1",
+    "wrangler": "^4.166.0"
+  },
+  "private": true,
+  "type": "module"
+}
