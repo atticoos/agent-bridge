@@ -4,8 +4,8 @@ import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validatio
 import { insufficientScope, type OAuthResourceAuth } from '@cloudflare/workers-oauth-provider';
 import { z } from 'zod';
 import { allowedUserIds, intVar, parseTargets, tokenSecretName, type AuthProps, type Env } from './env';
-import { formatHandoff, fireRoutine, RoutineFireError, MAX_TEXT_LENGTH, type Handoff } from './routine';
-import { audit, dedupeKey, findDuplicate, firesInLastHour, recordFire, rememberHandoff, sha256Hex } from './guard';
+import { formatHandoff, fireRoutine, isProjectPausedError, RoutineFireError, MAX_TEXT_LENGTH, sessionKey, type FireResult, type Handoff } from './routine';
+import { audit, dedupeKey, findDuplicate, firesInLastHour, recordFire, rememberHandoff, sha256Hex, storePickup } from './guard';
 
 export const HANDOFF_SCOPE = 'handoff';
 
@@ -141,7 +141,26 @@ export function buildServer(env: Env, props: AuthProps, auth: OAuthResourceAuth)
       }
 
       try {
-        const result = await fireRoutine(target.routineId, token, text);
+        let result: FireResult;
+        let delivery: 'text' | 'pickup' = target.delivery === 'pickup' ? 'pickup' : 'text';
+        if (delivery === 'text') {
+          try {
+            result = await fireRoutine(target.routineId, token, text);
+          } catch (err) {
+            if (target.delivery !== 'auto' || !isProjectPausedError(err)) throw err;
+            // The API rejects `text` for Project routines (anthropics/claude-code#102874). Fire without it.
+            console.warn(JSON.stringify({ event: 'fallback_to_pickup', target: target.name, handoffId }));
+            delivery = 'pickup';
+            result = await fireRoutine(target.routineId, token, null);
+          }
+        } else {
+          result = await fireRoutine(target.routineId, token, null);
+        }
+        if (delivery === 'pickup') {
+          const key = sessionKey(result.sessionId);
+          if (!key) throw new RoutineFireError('The routine API returned a session id in an unexpected format.', 502);
+          await storePickup(env.BRIDGE_KV, key, text);
+        }
         await recordFire(env.BRIDGE_KV);
         await rememberHandoff(
           env.BRIDGE_KV,
@@ -149,7 +168,7 @@ export function buildServer(env: Env, props: AuthProps, auth: OAuthResourceAuth)
           { sessionUrl: result.sessionUrl, sessionId: result.sessionId, handoffId, at: base.at },
           intVar(env.DEDUPE_WINDOW_SECONDS, 600)
         );
-        await audit(env.BRIDGE_KV, { ...base, outcome: 'fired', sessionUrl: result.sessionUrl });
+        await audit(env.BRIDGE_KV, { ...base, outcome: 'fired', delivery, sessionUrl: result.sessionUrl });
         return textResult(
           `Handed off to Claude (${target.name}). Claude session: ${result.sessionUrl}\n` +
             'Share this link with the user. Claude will plan first and ask for approval before changing anything.'

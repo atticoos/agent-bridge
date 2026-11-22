@@ -5,6 +5,8 @@ import {
   type ConsentDescription,
 } from '@cloudflare/workers-oauth-provider';
 import { allowedUserIds, type AuthProps, type Env } from './env';
+import { readPickup } from './guard';
+import { sessionKey } from './routine';
 import { HANDOFF_SCOPE } from './mcp';
 
 const GITHUB_AUTHORIZE = 'https://github.com/login/oauth/authorize';
@@ -122,6 +124,18 @@ export const defaultHandler = {
     try {
       if (url.pathname === '/' && request.method === 'GET') {
         return new Response('agent-bridge: MCP endpoint at /mcp\n', { headers: { 'content-type': 'text/plain' } });
+      }
+
+      // Handoff pickup for sessions fired without `text` (see Delivery in env.ts). The session id is the
+      // capability: it is unguessable, known only to the bridge, ChatGPT and the session, and expires in 24h.
+      const pickup = /^\/handoff\/([^/]+)$/.exec(url.pathname);
+      if (pickup && request.method === 'GET') {
+        const key = sessionKey(decodeURIComponent(pickup[1]));
+        const text = key ? await readPickup(env.BRIDGE_KV, key) : null;
+        const headers = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' };
+        if (!text) return new Response('No handoff for this session (yet).\n', { status: 404, headers: { ...headers, 'content-type': 'text/plain; charset=utf-8' } });
+        console.log(JSON.stringify({ event: 'pickup', sessionKey: key }));
+        return new Response(text, { headers: { ...headers, 'content-type': 'text/markdown; charset=utf-8' } });
       }
 
       if (url.pathname === '/authorize' && request.method === 'GET') {

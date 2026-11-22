@@ -64,6 +64,7 @@ export interface AuditEntry {
   contentSha256: string;
   textLength: number;
   outcome: 'fired' | 'duplicate' | 'rate_limited' | 'error';
+  delivery?: 'text' | 'pickup';
   sessionUrl?: string;
   error?: string;
 }
@@ -74,4 +75,15 @@ export async function audit(kv: KVNamespace, entry: AuditEntry): Promise<void> {
   // Reverse-chronological keys so `wrangler kv key list --prefix audit:` shows newest first.
   const reverse = String(9_999_999_999_999 - Date.parse(entry.at)).padStart(13, '0');
   await kv.put(`audit:${reverse}:${entry.handoffId}`, JSON.stringify(entry), { expirationTtl: AUDIT_TTL });
+}
+
+const PICKUP_TTL = 24 * HOUR;
+
+/** Holds the handoff text for a session that was fired without it. Key: the session id (prefix-free). */
+export async function storePickup(kv: KVNamespace, sessionKey: string, text: string): Promise<void> {
+  await kv.put(`pickup:${sessionKey}`, text, { expirationTtl: PICKUP_TTL });
+}
+
+export async function readPickup(kv: KVNamespace, sessionKey: string): Promise<string | null> {
+  return kv.get(`pickup:${sessionKey}`);
 }
