@@ -73,11 +73,17 @@ export interface FireResult {
   sessionUrl: string;
 }
 
+/** Same shape as the api_token_hint Claude shows for a routine, e.g. sk-ant-oat01-ClyYsTT7...3gAA. Safe to log. */
+export function tokenHint(token: string): string {
+  return token.length > 24 ? `${token.slice(0, 21)}...${token.slice(-4)}` : '(too short to be a routine token)';
+}
+
 export class RoutineFireError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    readonly retryAfter?: string
+    readonly retryAfter?: string,
+    readonly apiErrorType?: string
   ) {
     super(message);
     this.name = 'RoutineFireError';
@@ -90,9 +96,9 @@ function explain(status: number, apiMessage: string): string {
     case 400:
       return `The routine rejected the request (it may be paused): ${apiMessage}`;
     case 401:
-      return 'The routine token on the server is missing, wrong or was rotated. Generate a new API token for the routine and update the Worker secret.';
+      return 'The routine API rejected the server\'s routine token (HTTP 401). The Worker secret does not match the routine\'s current API token: it was mistyped, or the token was regenerated after the secret was set. Update the secret with the current token.';
     case 403:
-      return 'This account has no access to the routine fire endpoint.';
+      return `The routine API refused access (HTTP 403): ${apiMessage}`;
     case 404:
       return 'The routine was not found. Check routine_id in HANDOFF_TARGETS.';
     case 429:
@@ -110,6 +116,10 @@ export async function fireRoutine(
 ): Promise<FireResult> {
   if (text.length > MAX_TEXT_LENGTH) {
     throw new RoutineFireError(`Handoff is ${text.length} characters; the routine accepts at most ${MAX_TEXT_LENGTH}.`, 400);
+  }
+  token = token.trim();
+  if (!token.startsWith('sk-ant-oat01-')) {
+    throw new RoutineFireError('The routine token secret on the server does not look like a routine API token (it should start with sk-ant-oat01-).', 401);
   }
   const res = await fetchImpl(`${FIRE_API_BASE}/${encodeURIComponent(routineId)}/fire`, {
     method: 'POST',
@@ -130,7 +140,12 @@ export async function fireRoutine(
   }
   if (!res.ok) {
     const apiMessage = String(data?.error?.message ?? res.statusText ?? '').slice(0, 300);
-    throw new RoutineFireError(explain(res.status, apiMessage), res.status, res.headers.get('retry-after') ?? undefined);
+    const apiErrorType = typeof data?.error?.type === 'string' ? data.error.type : undefined;
+    // Logged for `wrangler tail`; compare the hint with the routine's token hint on claude.ai.
+    console.warn(
+      JSON.stringify({ event: 'fire_failed', routineId, status: res.status, apiErrorType, apiMessage, tokenHint: tokenHint(token) })
+    );
+    throw new RoutineFireError(explain(res.status, apiMessage), res.status, res.headers.get('retry-after') ?? undefined, apiErrorType);
   }
   const sessionId = data?.claude_code_session_id;
   const sessionUrl = data?.claude_code_session_url;

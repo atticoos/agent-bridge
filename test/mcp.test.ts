@@ -23,7 +23,7 @@ function makeEnv(overrides: Partial<Env> = {}) {
   return {
     BRIDGE_KV: memoryKv(),
     HANDOFF_TARGETS: '{"relayrunner":{"routine_id":"trig_013Zz","description":"RelayRunner"}}',
-    ROUTINE_TOKEN_RELAYRUNNER: 'sk-ant-oat01-secret',
+    ROUTINE_TOKEN_RELAYRUNNER: 'sk-ant-oat01-secret-token-value',
     ALLOWED_GITHUB_USER_IDS: '656630',
     ...overrides,
   } as unknown as Env & { BRIDGE_KV: { store: Map<string, string> } };
