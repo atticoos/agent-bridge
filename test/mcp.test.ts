@@ -106,3 +106,59 @@ describe('MCP tools', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe('pickup delivery (workaround for anthropics/claude-code#102874)', () => {
+  const paused = () =>
+    Response.json(
+      { type: 'error', error: { type: 'permission_error', message: 'this project is paused' } },
+      { status: 403 }
+    );
+  const ok = () =>
+    Response.json({ claude_code_session_id: 'session_01AbCdEfGhIjKlMnOp', claude_code_session_url: 'https://claude.ai/code/session_01AbCdEfGhIjKlMnOp' });
+
+  it('falls back to an empty-body fire and stores the text for the session to pick up', async () => {
+    const bodies: any[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (_u: string, init: RequestInit) => {
+      const body = JSON.parse(String(init.body));
+      bodies.push(body);
+      return 'text' in body ? paused() : ok();
+    }));
+    const env = makeEnv();
+    const client = await connect(env);
+    const res = await client.callTool({ name: 'handoff_to_claude', arguments: handoff });
+    expect(res.isError).toBeFalsy();
+    expect(bodies).toEqual([expect.objectContaining({ text: expect.any(String) }), {}]);
+    const stored = env.BRIDGE_KV.store.get('pickup:01AbCdEfGhIjKlMnOp');
+    expect(stored).toContain('Find why the e2e suite flakes');
+
+    // The session fetches it with its own id, which carries the cse_ prefix inside the session.
+    const { defaultHandler } = await import('../src/auth');
+    const got = await defaultHandler.fetch(new Request('https://bridge.example/handoff/cse_01AbCdEfGhIjKlMnOp'), env as any);
+    expect(got.status).toBe(200);
+    expect(await got.text()).toContain('Find why the e2e suite flakes');
+    const missing = await defaultHandler.fetch(new Request('https://bridge.example/handoff/cse_01Nope0000000000'), env as any);
+    expect(missing.status).toBe(404);
+  });
+
+  it('does not fall back on other 403s', async () => {
+    const fetchMock = vi.fn(async () =>
+      Response.json({ type: 'error', error: { type: 'permission_error', message: 'no access' } }, { status: 403 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = await connect(makeEnv());
+    const res = await client.callTool({ name: 'handoff_to_claude', arguments: handoff });
+    expect(res.isError).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires once with an empty body when the target is set to pickup', async () => {
+    const fetchMock = vi.fn(async () => ok());
+    vi.stubGlobal('fetch', fetchMock);
+    const env = makeEnv({ HANDOFF_TARGETS: '{"relayrunner":{"routine_id":"trig_013Zz","delivery":"pickup"}}' });
+    const client = await connect(env);
+    await client.callTool({ name: 'handoff_to_claude', arguments: handoff });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as any)[1].body))).toEqual({});
+    expect(env.BRIDGE_KV.store.has('pickup:01AbCdEfGhIjKlMnOp')).toBe(true);
+  });
+});

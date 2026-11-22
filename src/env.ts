@@ -39,10 +39,20 @@ export interface AuthProps {
   githubLogin: string;
 }
 
+/**
+ * How the handoff text reaches the session:
+ * - text:   in the fire request's `text` field (the documented way).
+ * - pickup: fire with an empty body; the session fetches the text from GET /handoff/<its session id>.
+ * - auto:   try `text`, and fall back to pickup when the API answers 403 "this project is paused"
+ *           (anthropics/claude-code#102874). The default.
+ */
+export type Delivery = 'auto' | 'text' | 'pickup';
+
 export interface HandoffTarget {
   name: string;
   routineId: string;
   description: string;
+  delivery: Delivery;
 }
 
 export function parseTargets(raw: string | undefined): HandoffTarget[] {
@@ -65,7 +75,11 @@ export function parseTargets(raw: string | undefined): HandoffTarget[] {
     if (!/^trig_[A-Za-z0-9]+$/.test(routineId)) {
       throw new Error(`HANDOFF_TARGETS: target "${name}" needs a routine_id starting with trig_`);
     }
-    return { name, routineId, description: String(v.description ?? '') };
+    const delivery = (v.delivery ?? 'auto') as Delivery;
+    if (!['auto', 'text', 'pickup'].includes(delivery)) {
+      throw new Error(`HANDOFF_TARGETS: target "${name}" has delivery "${delivery}"; use auto, text or pickup`);
+    }
+    return { name, routineId, description: String(v.description ?? ''), delivery };
   });
 }
 

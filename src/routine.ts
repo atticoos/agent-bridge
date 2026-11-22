@@ -108,13 +108,17 @@ function explain(status: number, apiMessage: string): string {
   }
 }
 
+/**
+ * Fire a routine. Pass `text: null` to fire with an empty body: a workaround for the API rejecting
+ * `text` on Project routines with 403 "this project is paused" (anthropics/claude-code#102874).
+ */
 export async function fireRoutine(
   routineId: string,
   token: string,
-  text: string,
+  text: string | null,
   fetchImpl: typeof fetch = fetch
 ): Promise<FireResult> {
-  if (text.length > MAX_TEXT_LENGTH) {
+  if (text !== null && text.length > MAX_TEXT_LENGTH) {
     throw new RoutineFireError(`Handoff is ${text.length} characters; the routine accepts at most ${MAX_TEXT_LENGTH}.`, 400);
   }
   token = token.trim();
@@ -129,7 +133,7 @@ export async function fireRoutine(
       'anthropic-beta': ROUTINE_BETA,
       'content-type': 'application/json',
     },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(text === null ? {} : { text }),
   });
   const raw = await res.text();
   let data: any = null;
@@ -153,4 +157,15 @@ export async function fireRoutine(
     throw new RoutineFireError('The routine API returned an unexpected response.', 502);
   }
   return { sessionId, sessionUrl };
+}
+
+/** True for the 403 the fire API returns for `text` on Project routines (anthropics/claude-code#102874). */
+export function isProjectPausedError(err: unknown): boolean {
+  return err instanceof RoutineFireError && err.status === 403 && err.apiErrorType === 'permission_error' && /paused/i.test(err.message);
+}
+
+/** The id part shared by `session_…` (fire API) and `cse_…` (CLAUDE_CODE_REMOTE_SESSION_ID inside the session). */
+export function sessionKey(sessionId: string): string | null {
+  const m = /^(?:session_|cse_)?([A-Za-z0-9]{10,64})$/.exec(sessionId.trim());
+  return m ? m[1] : null;
 }
