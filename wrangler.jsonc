@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "agent-bridge",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  // nodejs_compat for the MCP SDK; global_fetch_strictly_public is required when accepting Client ID Metadata Documents.
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "observability": { "enabled": true },
+  "kv_namespaces": [
+    // Create with: npx wrangler kv namespace create OAUTH_KV  (and BRIDGE_KV), then paste the ids here.
+    { "binding": "OAUTH_KV", "id": "REPLACE_WITH_OAUTH_KV_ID" },
+    { "binding": "BRIDGE_KV", "id": "REPLACE_WITH_BRIDGE_KV_ID" }
+  ],
+  "vars": {
+    // Your Worker's https origin, lowercase, no trailing slash.
+    "PUBLIC_ORIGIN": "https://agent-bridge.REPLACE_WITH_SUBDOMAIN.workers.dev",
+    // GitHub numeric user ids allowed to sign in (656630 = atticoos).
+    "ALLOWED_GITHUB_USER_IDS": "656630",
+    // Routines ChatGPT may fire. Each target's token goes in the secret ROUTINE_TOKEN_<NAME>.
+    "HANDOFF_TARGETS": "{\"relayrunner\":{\"routine_id\":\"trig_013Zzv6HdXEiaeaWhUQD54pW\",\"description\":\"RelayRunner project (ChatGPT Handoff routine)\"}}",
+    "MAX_FIRES_PER_HOUR": "20",
+    "DEDUPE_WINDOW_SECONDS": "600"
+  }
+  // Secrets (npx wrangler secret put <NAME>): GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, ROUTINE_TOKEN_RELAYRUNNER
+}
