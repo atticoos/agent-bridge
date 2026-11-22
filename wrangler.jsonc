@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "agent-bridge",
+  "account_id": "dbf0d324e54d944100bc59af9ee3ba5f",
   "main": "src/index.ts",
   "compatibility_date": "2026-11-01",
   // nodejs_compat for the MCP SDK; global_fetch_strictly_public is required when accepting Client ID Metadata Documents.
