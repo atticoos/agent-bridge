@@ -8,9 +8,10 @@
   "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "observability": { "enabled": true },
   "kv_namespaces": [
-    // Create with: npx wrangler kv namespace create OAUTH_KV  (and BRIDGE_KV), then paste the ids here.
-    { "binding": "OAUTH_KV", "id": "REPLACE_WITH_OAUTH_KV_ID" },
-    { "binding": "BRIDGE_KV", "id": "REPLACE_WITH_BRIDGE_KV_ID" }
+    // Create with: npx wrangler kv namespace create agent-bridge-oauth-kv  (and agent-bridge-bridge-kv), then paste the ids here.
+    // Keep the binding names as-is; the code reads env.OAUTH_KV / env.BRIDGE_KV.
+    { "binding": "OAUTH_KV", "id": "3c9808cf41cf4b2cb356018315f916dd" },
+    { "binding": "BRIDGE_KV", "id": "a64ca178e7a24a7e9336c43262d941a3" }
   ],
   "vars": {
     // Your Worker's https origin, lowercase, no trailing slash.

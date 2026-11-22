@@ -43,11 +43,11 @@ KV is eventually consistent, so the rate limit and duplicate check are best-effo
 ```sh
 npm install
 npx wrangler login
-npx wrangler kv namespace create OAUTH_KV
-npx wrangler kv namespace create BRIDGE_KV
+npx wrangler kv namespace create agent-bridge-oauth-kv
+npx wrangler kv namespace create agent-bridge-bridge-kv
 ```
 
-Paste both ids into `wrangler.jsonc`. Then set `PUBLIC_ORIGIN` to the Worker's URL, for example `https://agent-bridge.<your-subdomain>.workers.dev`. A custom domain also works.
+Paste both ids into `wrangler.jsonc` under the `OAUTH_KV` and `BRIDGE_KV` bindings (keep those binding names; the code depends on them). Set `account_id` there too if your login can reach more than one Cloudflare account. Then set `PUBLIC_ORIGIN` to the Worker's URL, for example `https://agent-bridge.<your-subdomain>.workers.dev`. A custom domain also works.
 
 ### 2. GitHub OAuth App (sign-in only)
 
