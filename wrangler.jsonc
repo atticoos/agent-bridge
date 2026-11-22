@@ -15,7 +15,7 @@
   ],
   "vars": {
     // Your Worker's https origin, lowercase, no trailing slash.
-    "PUBLIC_ORIGIN": "https://agent-bridge.REPLACE_WITH_SUBDOMAIN.workers.dev",
+    "PUBLIC_ORIGIN": "https://agent-bridge.awlabs.workers.dev",
     // GitHub numeric user ids allowed to sign in (656630 = atticoos).
     "ALLOWED_GITHUB_USER_IDS": "656630",
     // Routines ChatGPT may fire. Each target's token goes in the secret ROUTINE_TOKEN_<NAME>.
