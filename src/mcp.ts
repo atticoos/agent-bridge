@@ -156,7 +156,7 @@ export function buildServer(env: Env, props: AuthProps, auth: OAuthResourceAuth)
         );
       } catch (err) {
         const message = err instanceof RoutineFireError ? err.message : 'Unexpected error while starting the Claude session.';
-        await audit(env.BRIDGE_KV, { ...base, outcome: 'error', error: err instanceof RoutineFireError ? `http_${err.status}` : 'unexpected' });
+        await audit(env.BRIDGE_KV, { ...base, outcome: 'error', error: err instanceof RoutineFireError ? `http_${err.status}${err.apiErrorType ? `:${err.apiErrorType}` : ''}` : 'unexpected' });
         if (!(err instanceof RoutineFireError)) console.error('fire failed', err);
         return textResult(message, true);
       }

@@ -106,6 +106,16 @@ The secret name is `ROUTINE_TOKEN_` followed by the target name in upper case, w
 - **To cut off everyone at once,** empty `ALLOWED_GITHUB_USER_IDS` and redeploy. The check runs on every request.
 - **To stop routine fires even if the Worker is compromised,** regenerate the routine token in Claude.
 
+## Troubleshooting
+
+**The handoff fails with HTTP 401.** The `ROUTINE_TOKEN_<NAME>` secret doesn't match the routine's current API token. Generating a token revokes the previous one, so a secret you set before regenerating stops working. To fix it:
+
+1. Run `npx wrangler tail` and retry the handoff. The `fire_failed` log line includes a `tokenHint` such as `sk-ant-oat01-ClyYsTT7...3gAA`.
+2. Compare that hint with the one claude.ai shows for the routine.
+3. If they differ, put the current token in the secret with `npx wrangler secret put ROUTINE_TOKEN_RELAYRUNNER`, or generate a new token and set it straight away.
+
+**ChatGPT lists targets, but a target says "not ready".** Its token secret is missing.
+
 ## Development
 
 ```sh
